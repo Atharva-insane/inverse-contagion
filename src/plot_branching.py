@@ -54,22 +54,22 @@ def plot_branching(model_path='../models/nghp_model.pth', data_dir='../processed
     # Calculate the Total Outgoing Branching Ratio (Sum over all targets)
     out_branching = np.sum(Gamma, axis=0)
     
-    # Sort and get top 15 most contagious airports
-    top_n = 15
-    top_indices = np.argsort(out_branching)[::-1][:top_n]
+    # Sort and plot EVERY airport
+    top_n = len(airports)
+    top_indices = np.argsort(out_branching)[::-1]
     
     top_airports_labels = [airports[i] for i in top_indices]
     top_branching_values = out_branching[top_indices]
     
-    # Create a sleek horizontal bar chart
-    plt.figure(figsize=(12, 8))
+    # Create a sleek horizontal bar chart (Taller to fit all 50 airports)
+    plt.figure(figsize=(12, 16))
     
     # Use a colormap to emphasize severity
     colors = plt.cm.Reds(np.linspace(0.8, 0.3, top_n))
     
     bars = plt.barh(np.arange(top_n), top_branching_values[::-1], color=colors[::-1], edgecolor='black')
     
-    plt.yticks(np.arange(top_n), top_airports_labels[::-1], fontsize=12, fontweight='bold')
+    plt.yticks(np.arange(top_n), top_airports_labels[::-1], fontsize=10, fontweight='bold')
     plt.xlabel('Total Expected Offspring (Cascading Delays Triggered per 1 Initial Delay)', fontsize=14)
     plt.title('Aviation Systemic Risk Index\n(Network Branching Ratio by Source Airport)', fontsize=18, fontweight='bold')
     
@@ -77,7 +77,7 @@ def plot_branching(model_path='../models/nghp_model.pth', data_dir='../processed
     for bar in bars:
         width = bar.get_width()
         plt.text(width + 0.05, bar.get_y() + bar.get_height()/2, 
-                 f'{width:.2f}', va='center', ha='left', fontsize=12)
+                 f'{width:.2f}', va='center', ha='left', fontsize=9)
                  
     # Adjust x-axis limit to fit text
     max_val = np.max(top_branching_values)
