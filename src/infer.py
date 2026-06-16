@@ -34,10 +34,18 @@ def reverse_engineer_cascade(model_path='../models/nghp_model.pth', data_dir='..
     model.to(device)
     adj_tensor = torch.FloatTensor(adj).to(device)
     
-    # Create an artificial starting state: Severe delay at Airport 0
+    # Find index for JFK (New York)
+    target_airport = 'JFK'
+    if target_airport in airports:
+        target_idx = airports.index(target_airport)
+    else:
+        target_idx = 0 # Fallback
+        target_airport = airports[0]
+        
+    # Create an artificial starting state: Severe delay at target airport
     seed_cascade = np.zeros((1, seq_len, num_nodes, node_features))
     seed_cascade[0, :, :, 0] = 0.0 # Clear historical delays
-    seed_cascade[0, -1, 0, 0] = 300.0 # 300 min delay at airport 0 at t-1
+    seed_cascade[0, -1, target_idx, 0] = 50.0 # 50 delay events at target at t-1
     
     # Set time covariates to a fixed value (e.g., sin=0, cos=1 for midnight)
     seed_cascade[0, :, :, 1] = 0.0
@@ -56,24 +64,24 @@ def reverse_engineer_cascade(model_path='../models/nghp_model.pth', data_dir='..
     
     affected_airports = np.argsort(predicted_delays)[::-1]
     
-    print(f"\nSource of historical disruption: {airports[0]}")
-    print("Top 5 Airports infected (Total Expected Delay = Background + Contagion):")
+    print(f"\nSource of historical disruption: {target_airport}")
+    print("Top 5 Airports infected (Total Expected Delay Events = Background + Contagion):")
     for idx in affected_airports[:5]:
-        if idx != 0 and predicted_delays[idx] > 0:
-             print(f" - {airports[idx]}: Total: {predicted_delays[idx]:.2f} mins (Background: {mu_np[idx]:.2f}, Contagion: {contagion_np[idx]:.2f})")
+        if idx != target_idx and predicted_delays[idx] > 0:
+             print(f" - {airports[idx]}: Total: {predicted_delays[idx]:.2f} events (Background: {mu_np[idx]:.2f}, Contagion: {contagion_np[idx]:.2f})")
 
     # 2. Extract Hawkes Infectivity
     last_step_alpha = alpha[-1].cpu().numpy() # (N, N)
     
     print(f"\n--- Hawkes Infectivity Matrix Analysis ---")
-    print(f"Which edges allowed the infection to spread from {airports[0]}?")
+    print(f"Which edges allowed the infection to spread from {target_airport}?")
     
-    att_from_source = last_step_alpha[:, 0]
+    att_from_source = last_step_alpha[:, target_idx]
     att_sorted_indices = np.argsort(att_from_source)[::-1]
     
     for idx in att_sorted_indices[:5]:
-        if idx != 0 and att_from_source[idx] > 0:
-            print(f" - Edge {airports[0]} -> {airports[idx]} | Infectivity alpha: {att_from_source[idx]:.4f}")
+        if idx != target_idx and att_from_source[idx] > 0:
+            print(f" - Edge {target_airport} -> {airports[idx]} | Infectivity alpha: {att_from_source[idx]:.4f}")
             
     print("\nNotice how the model explicitly decouples the 'Background' delay from the 'Contagion' delay.")
 

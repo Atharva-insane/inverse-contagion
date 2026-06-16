@@ -38,9 +38,8 @@ def train_model(data_dir='../processed_data', epochs=20, batch_size=16, lr=0.001
     
     model = NeuralGraphHawkesProcess(num_nodes=num_nodes, node_features=node_features, seq_len=seq_len).to(device)
     
-    # In discrete time, MSE on the intensity is a valid proxy for least-squares Hawkes fitting.
-    # We could also use Poisson NLL, but MSE is robust for continuous delay minutes.
-    criterion = nn.MSELoss() 
+    # Optimize the Point-Process Negative Log-Likelihood (NLL) for discrete event counts
+    criterion = nn.PoissonNLLLoss(log_input=False, full=True)
     optimizer = optim.Adam(model.parameters(), lr=lr)
     
     print("Starting training of NGHP...")
@@ -66,7 +65,7 @@ def train_model(data_dir='../processed_data', epochs=20, batch_size=16, lr=0.001
                 val_loss += loss.item()
         val_loss /= len(val_loader)
         
-        print(f"Epoch {epoch+1}/{epochs} | Train Loss (MSE on Intensity): {train_loss:.4f} | Val Loss: {val_loss:.4f}")
+        print(f"Epoch {epoch+1}/{epochs} | Train Loss (Poisson NLL): {train_loss:.4f} | Val NLL Loss: {val_loss:.4f}")
         
     os.makedirs('../models', exist_ok=True)
     torch.save(model.state_dict(), '../models/nghp_model.pth')

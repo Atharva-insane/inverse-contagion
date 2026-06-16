@@ -66,8 +66,8 @@ class NeuralGraphHawkesProcess(nn.Module):
         self.infectivity_net = GraphAttentionInfectivity(in_features=node_features)
         
         # Time Decay Parameter beta
-        # We learn a base beta for the exponential decay
-        self.beta = nn.Parameter(torch.tensor([0.1]))
+        # We learn a node-specific beta for the exponential decay (mixture kernel proxy)
+        self.beta = nn.Parameter(torch.ones(num_nodes) * 0.1)
 
     def forward(self, x, adj):
         """
@@ -94,15 +94,17 @@ class NeuralGraphHawkesProcess(nn.Module):
         # x[:, :, :, 0] are the historical delays. Shape: (B, SeqLen, N)
         delays = x[:, :, :, 0]
         
-        # Create decay vector: e^(-beta * k) where k goes from SeqLen down to 1
-        # so delays[:, -1, :] corresponds to k=1 (1 hour ago)
+        # Create decay vector: e^(-beta_i * k) where k goes from SeqLen down to 1
         k_values = torch.arange(self.seq_len, 0, -1, device=x.device, dtype=torch.float32)
-        decay = torch.exp(-F.softplus(self.beta) * k_values) # (SeqLen)
+        # self.beta is (N,). k_values is (SeqLen,).
+        # We want decay to be (N, SeqLen)
+        beta_pos = F.softplus(self.beta).unsqueeze(1) # (N, 1)
+        decay_matrix = torch.exp(-beta_pos * k_values.unsqueeze(0)) # (N, SeqLen)
         
         # Apply decay to historical delays
         # delays: (B, SeqLen, N)
-        # decay: (SeqLen) -> (1, SeqLen, 1)
-        decay = decay.unsqueeze(0).unsqueeze(-1)
+        # decay_matrix: (N, SeqLen) -> transpose to (SeqLen, N) -> unsqueeze to (1, SeqLen, N)
+        decay = decay_matrix.transpose(0, 1).unsqueeze(0)
         decayed_history = delays * decay # (B, SeqLen, N)
         
         # Sum over time

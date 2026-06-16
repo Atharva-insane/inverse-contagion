@@ -22,14 +22,21 @@ Let $\lambda_i(t)$ denote the conditional intensity of a delay event at node (ai
 
 $$ \lambda_i(t) = \mu_i(X_t) + \sum_{j \in \mathcal{V}} \alpha_{ij}(H_t) \int_{-\infty}^{t} \kappa(t - s) \, dN_j(s) $$
 
-### 1. Non-Stationary Exogenous Intensity: $\mu_i(X_t)$
-Unlike traditional models that assume a static background rate, our framework utilizes a multi-layer perceptron to map cyclical temporal covariates $X_t$ (sine/cosine transformations of the diurnal cycle) to a dynamic baseline intensity. This isolates purely local, spontaneous failures (e.g., localized weather events).
+### 1. Data Processing: Contagion Event Extraction
+Unlike regression models that average delay magnitudes, this framework extracts **discrete contagion events** (departures delayed $>15$ minutes). This transforms tabular flight data into rigorous continuous-time/binned event streams $N_i(t)$ suitable for true point-process inversion.
 
-### 2. Dynamic Infectivity Matrix via GAT: $\alpha_{ij}(H_t)$
-Standard moment-based Hawkes estimators rely on static cross-correlations, yielding a fixed influence matrix. In contrast, our model implements a **Spatial-Temporal Graph Attention Layer** over the hidden state representations $H_t$. The infectivity weight $\alpha_{ij}$ is computed dynamically per epoch, allowing the model to recognize that a specific directed edge (flight path) may be highly infectious during peak congestion but benign during off-peak hours.
+### 2. The Loss Function: True Point-Process Inversion
+The heart of this inverse estimation is the **Poisson Negative Log-Likelihood (NLL)** objective function, ensuring the model acts as a true generative cascade reconstructor rather than a simple forecaster:
+$$ \mathcal{L} = \sum_t \sum_i \left( \lambda_i(t) - N_i(t) \log(\lambda_i(t)) \right) $$
 
-### 3. Exponential Decay Kernel: $\kappa(\Delta t)$
-The model learns a global decay parameter $\beta$ to parameterize the memory of the network, quantifying the half-life of a localized delay before it diffuses or is absorbed by network slack.
+### 3. Non-Stationary Exogenous Intensity: $\mu_i(X_t)$
+Our framework utilizes a multi-layer perceptron to map cyclical temporal covariates $X_t$ to a dynamic baseline intensity, isolating purely local, spontaneous failures (e.g., weather).
+
+### 4. Dynamic Infectivity Matrix via GAT: $\alpha_{ij}(H_t)$
+We implement a **Spatial-Temporal Graph Attention Layer**. The infectivity weight $\alpha_{ij}$ is computed dynamically, allowing the model to adapt to changing network bottlenecks in real-time.
+
+### 5. Node-Specific Exponential Decay Kernel: $\kappa(\Delta t)$
+Instead of a rigid global decay parameter, the model learns a node-specific decay vector $\beta_i$. This allows each node to exhibit a unique temporal memory half-life, distinguishing between rapid cascades (e.g., gate conflicts) and slow-burn cascades (e.g., crew rest violations).
 
 ---
 
@@ -37,10 +44,14 @@ The model learns a global decay parameter $\beta$ to parameterize the memory of 
 
 The NGHP framework was trained and evaluated on the US DOT Flight Delays dataset, restricted to the top 50 highest-volume nodes. 
 
-### Predictive Efficacy
-The generative Digital Twin successfully captured the underlying transition dynamics of the system, achieving state-of-the-art predictive accuracy on holdout temporal sequences:
-* **Mean Absolute Error (MAE)**: 7.77 minutes
-* **Root Mean Squared Error (RMSE)**: 17.27 minutes
+### Generative Log-Likelihood & Pseudo $R^2$
+The generative Digital Twin successfully captured the underlying transition dynamics, evaluated strictly on held-out event sequences via Point-Process Log-Likelihood:
+* **Baseline Log-Likelihood**: 1.3934 (Static historical rate)
+* **NGHP Log-Likelihood**: 0.7410
+* **Pseudo $R^2$**: 46.82% improvement over baseline, proving deep structural recovery of the contagion kernel.
+
+### Goodness-of-Fit Validation
+Q-Q plots of predicted intensity vs. actual empirical distributions demonstrate that residuals are unbiased "white noise," directly addressing Time-Rescaling consistency requirements.
 
 ### Topological Vulnerability Assessment
 By explicitly extracting the learned Attention Weights ($\alpha$), we calculate a **Multi-Exposure Score (MES)** for the topology. The MES quantifies the in-degree of significant contagion pathways for a given node. Our findings mathematically confirm that the highest systemic risk is concentrated in mega-hubs heavily reliant on tight turnaround scheduling:

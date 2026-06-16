@@ -31,9 +31,12 @@ def plot_insights(model_path='../models/nghp_model.pth', data_dir='../processed_
 
     os.makedirs('../output', exist_ok=True)
     
+    target_apt = 'ATL'
+    target_idx = airports.index(target_apt) if target_apt in airports else 0
+    
     # --- INSIGHT 1: The Learned Exponential Decay Kernel ---
-    beta = torch.nn.functional.softplus(model.beta).item()
-    print(f"Learned Decay Parameter (Beta): {beta:.4f}")
+    beta = torch.nn.functional.softplus(model.beta)[target_idx].item()
+    print(f"Learned Decay Parameter for {airports[target_idx]} (Beta): {beta:.4f}")
     
     hours = np.linspace(0, 12, 100) # Plot over 12 hours
     decay_curve = np.exp(-beta * hours)

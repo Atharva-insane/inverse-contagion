@@ -40,9 +40,12 @@ def load_and_preprocess_data(csv_path, top_k_airports=50, seq_len=24):
     df['HOUR'] = (pd.to_numeric(df['SCHEDULED_DEPARTURE'], errors='coerce') // 100).fillna(0).astype(int)
     df.loc[df['HOUR'] > 23, 'HOUR'] = 23
     
-    # We group to get average delay, but we also want the time features
+    # Define a Contagion Event: A flight delayed by more than 15 minutes
+    df['IS_EVENT'] = (df['DEPARTURE_DELAY'] > 15).astype(int)
+    
+    # We group to get the COUNT of events, transforming the data into a discrete point process
     grouped = df.groupby(['MONTH', 'DAY', 'HOUR', 'ORIGIN_AIRPORT']).agg({
-        'DEPARTURE_DELAY': 'mean',
+        'IS_EVENT': 'sum',
         'DAY_OF_WEEK': 'first'
     }).reset_index()
     
@@ -54,8 +57,8 @@ def load_and_preprocess_data(csv_path, top_k_airports=50, seq_len=24):
     time_df = pd.DataFrame(index=index).reset_index()
     merged = pd.merge(time_df, grouped, on=['MONTH', 'DAY', 'HOUR'], how='left')
     
-    # Pivot Delay
-    pivot_delay = merged.pivot_table(index=['MONTH', 'DAY', 'HOUR'], columns='ORIGIN_AIRPORT', values='DEPARTURE_DELAY', fill_value=0)
+    # Pivot Event Counts
+    pivot_delay = merged.pivot_table(index=['MONTH', 'DAY', 'HOUR'], columns='ORIGIN_AIRPORT', values='IS_EVENT', fill_value=0)
     pivot_delay = pivot_delay.reindex(columns=top_airports, fill_value=0)
     
     # Pivot Day of Week
