@@ -23,32 +23,34 @@ def generate_visual_suite(model_dir='../models', data_dir='../processed_data', o
     
     # 1. Network Topology Graph
     print("Generating Contagion Topology Graph...")
-    plt.figure(figsize=(14, 12))
+    plt.figure(figsize=(16, 14))
     G = nx.DiGraph()
-    for i in range(num_nodes):
-        G.add_node(airports[i])
-        
-    # Add top 50 edges by alpha
-    flat_indices = np.argsort(alpha.flatten())[::-1][:75] # Top 75 edges
+    
+    # We only add nodes that actually have strong edges, to prevent "floating" disconnected nodes
+    flat_indices = np.argsort(alpha.flatten())[::-1][:100] # Top 100 edges
     for idx in flat_indices:
         i, j = np.unravel_index(idx, alpha.shape)
-        if alpha[i, j] > 0.001:
+        if alpha[i, j] > 0.005: # stricter threshold
             G.add_edge(airports[i], airports[j], weight=alpha[i, j]*50)
             
-    # Node sizes from Eigenvector Centrality
-    centrality_map = dict(zip(morph_df['Airport'], morph_df['Eigenvector_Centrality']))
-    node_sizes = [centrality_map.get(node, 0) * 10000 + 500 for node in G.nodes()]
+    # Sizing: We use Out-Strength (Contagiousness) instead of Eigenvector Centrality
+    # because Eigenvector Centrality often fails to converge on non-strongly connected subgraphs.
+    strength_map = dict(zip(morph_df['Airport'], morph_df['Out_Strength_Contagiousness']))
     
-    pos = nx.spring_layout(G, seed=42, k=0.5)
+    # Scale nodes: Baseline 500 + Contagiousness * 2000
+    node_sizes = [strength_map.get(node, 0) * 2000 + 500 for node in G.nodes()]
+    
+    # Use Kamada-Kawai layout for a much cleaner, aesthetic graph than spring_layout
+    pos = nx.kamada_kawai_layout(G)
     edges = G.edges()
     weights = [G[u][v]['weight'] for u,v in edges]
     
-    nx.draw_networkx_nodes(G, pos, node_size=node_sizes, node_color='lightcoral', alpha=0.8, edgecolors='black')
-    nx.draw_networkx_labels(G, pos, font_size=10, font_weight='bold')
+    nx.draw_networkx_nodes(G, pos, node_size=node_sizes, node_color='lightcoral', alpha=0.9, edgecolors='darkred', linewidths=2)
+    nx.draw_networkx_labels(G, pos, font_size=11, font_weight='bold', font_family='sans-serif')
     nx.draw_networkx_edges(G, pos, edgelist=edges, width=weights, edge_color='gray', 
-                           arrowsize=20, alpha=0.6, connectionstyle='arc3,rad=0.1')
+                           arrowsize=20, alpha=0.5, connectionstyle='arc3,rad=0.15')
                            
-    plt.title('Top 75 Structural Contagion Pathways', fontsize=20, fontweight='bold')
+    plt.title('US Aviation Systemic Risk: Top Contagion Pathways', fontsize=22, fontweight='bold')
     plt.axis('off')
     plt.tight_layout()
     plt.savefig(os.path.join(out_dir, 'network_topology.png'), dpi=300)
