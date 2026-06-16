@@ -9,8 +9,8 @@ processed_data/
 # Ignore saved model weights (keep the directory)
 models/*.pth
 
-# Ignore generated outputs
-output/
+# Ignore generated outputs (DISABLED - pushing outputs as requested)
+# output/
 
 # Python cache
 __pycache__/
