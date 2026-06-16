@@ -22,15 +22,18 @@ def train_model(data_dir='../processed_data', epochs=20, batch_size=16, lr=0.001
     X_tensor = torch.FloatTensor(X).to(device)
     Y_tensor = torch.FloatTensor(Y).to(device)
     adj_tensor = torch.FloatTensor(adj).to(device)
+    dataset_size = len(X_tensor)
+    train_size = int(0.8 * dataset_size)
     
-    dataset = TensorDataset(X_tensor, Y_tensor)
+    train_X, val_X = X_tensor[:train_size], X_tensor[train_size:]
+    train_Y, val_Y = Y_tensor[:train_size], Y_tensor[train_size:]
     
-    train_size = int(0.8 * len(dataset))
-    val_size = len(dataset) - train_size
-    train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
+    train_dataset = TensorDataset(train_X, train_Y)
+    val_dataset = TensorDataset(val_X, val_Y)
     
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size)
+    # Shuffle=False ensures strict chronological progression
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     
     num_nodes = X.shape[2]
     node_features = X.shape[3]

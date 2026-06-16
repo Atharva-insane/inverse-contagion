@@ -21,6 +21,10 @@ def visualize_contagion(model_path='../models/nghp_model.pth', data_dir='../proc
         adj = np.load(os.path.join(data_dir, 'adj.npy'))
         with open(os.path.join(data_dir, 'airports.pkl'), 'rb') as f:
             top_airports = pickle.load(f)
+            
+        dataset_size = len(X)
+        train_size = int(0.8 * dataset_size)
+        X_val = X[train_size:]
     except FileNotFoundError:
         print("Processed data not found. Run data_prep.py first.")
         return
@@ -45,17 +49,13 @@ def visualize_contagion(model_path='../models/nghp_model.pth', data_dir='../proc
     device = torch.device("cpu")
     adj_tensor = torch.FloatTensor(adj).to(device)
     
-    # Find index for JFK (New York)
-    target_airport = 'JFK'
-    if target_airport in top_airports:
-        target_idx = top_airports.index(target_airport)
-    else:
-        target_idx = 0 # Fallback
-        target_airport = top_airports[0]
+    # Replay a real historical cascade from the held-out validation set
+    max_delay_idx = np.unravel_index(np.argmax(X_val[:, -1, :, 0]), X_val[:, -1, :, 0].shape)
+    cascade_idx = max_delay_idx[0]
+    target_idx = max_delay_idx[1]
+    target_airport = top_airports[target_idx]
         
-    # Create an artificial severe delay at JFK
-    seed_cascade = np.zeros((1, seq_len, num_nodes, node_features))
-    seed_cascade[0, -1, target_idx, 0] = 50.0 # 50 delay events at the source
+    seed_cascade = X_val[cascade_idx:cascade_idx+1]
     seed_tensor = torch.FloatTensor(seed_cascade).to(device)
     
     with torch.no_grad():

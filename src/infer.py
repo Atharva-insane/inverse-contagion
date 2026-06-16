@@ -11,6 +11,11 @@ def reverse_engineer_cascade(model_path='../models/nghp_model.pth', data_dir='..
         adj = np.load(os.path.join(data_dir, 'adj.npy'))
         with open(os.path.join(data_dir, 'airports.pkl'), 'rb') as f:
             airports = pickle.load(f)
+            
+        # Extract held-out validation set chronologically
+        dataset_size = len(X)
+        train_size = int(0.8 * dataset_size)
+        X_val = X[train_size:]
     except FileNotFoundError:
         print("Required data/files not found.")
         return
@@ -34,24 +39,18 @@ def reverse_engineer_cascade(model_path='../models/nghp_model.pth', data_dir='..
     model.to(device)
     adj_tensor = torch.FloatTensor(adj).to(device)
     
-    # Find index for JFK (New York)
-    target_airport = 'JFK'
-    if target_airport in airports:
-        target_idx = airports.index(target_airport)
-    else:
-        target_idx = 0 # Fallback
-        target_airport = airports[0]
-        
-    # Create an artificial starting state: Severe delay at target airport
-    seed_cascade = np.zeros((1, seq_len, num_nodes, node_features))
-    seed_cascade[0, :, :, 0] = 0.0 # Clear historical delays
-    seed_cascade[0, -1, target_idx, 0] = 50.0 # 50 delay events at target at t-1
+    # Replay a real historical cascade from the held-out validation set
+    # Find the snapshot with the most severe delay event to trace its propagation
+    max_delay_idx = np.unravel_index(np.argmax(X_val[:, -1, :, 0]), X_val[:, -1, :, 0].shape)
+    cascade_idx = max_delay_idx[0]
+    target_idx = max_delay_idx[1]
+    target_airport = airports[target_idx]
     
-    # Set time covariates to a fixed value (e.g., sin=0, cos=1 for midnight)
-    seed_cascade[0, :, :, 1] = 0.0
-    seed_cascade[0, :, :, 2] = 1.0
-    
+    seed_cascade = X_val[cascade_idx:cascade_idx+1] # (1, seq_len, N, F)
     seed_tensor = torch.FloatTensor(seed_cascade).to(device)
+    
+    print(f"\n--- Replaying True Historical Cascade (Held-out Validation) ---")
+    print(f"Conditioning on observed network state. Primary disruption identified at: {target_airport}")
     
     # 1. Simulate the cascade intensity
     with torch.no_grad():

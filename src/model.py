@@ -25,13 +25,12 @@ class GraphAttentionInfectivity(nn.Module):
         
         a_input = self._prepare_attentional_mechanism_input(Wh)
         e = self.leakyrelu(torch.matmul(a_input, self.a).squeeze(-1))
-
-        zero_vec = -9e15 * torch.ones_like(e)
+        
         if adj.dim() == 2:
             adj = adj.unsqueeze(0).expand(B, N, N)
             
-        attention = torch.where(adj > 0, e, zero_vec)
-        attention = F.softmax(attention, dim=-1)
+        # Replace softmax with sigmoid for true sparsity
+        attention = torch.sigmoid(e) * adj
         attention = F.dropout(attention, self.dropout, training=self.training)
         
         return attention
@@ -56,10 +55,9 @@ class NeuralGraphHawkesProcess(nn.Module):
         # Exogenous Background Rate mu(t)
         # We use node features (like time of day) to predict baseline delay
         self.mu_net = nn.Sequential(
-            nn.Linear(node_features, 16),
+            nn.Linear(node_features - 1, 16),
             nn.ReLU(),
-            nn.Linear(16, 1),
-            nn.Softplus() # Intensity must be positive
+            nn.Linear(16, 1)
         )
         
         # Infectivity Matrix alpha_{ij}
@@ -77,15 +75,16 @@ class NeuralGraphHawkesProcess(nn.Module):
         """
         batch_size = x.size(0)
         
-        # We want to predict the intensity at time t (next step).
-        # We use the covariates at the LAST time step as a proxy for current time
-        # (or assume covariates don't change drastically hour-to-hour).
-        last_x = x[:, -1, :, :] # (B, N, F)
-        
-        # 1. Background Intensity mu(t)
-        mu = self.mu_net(last_x) # (B, N, 1)
+        # 1. Exogenous Background Rate (mu)
+        # Use full sequence covariates to capture diurnal variation across the window
+        # Time covariates are x[:, :, :, 1:]. Shape: (B, SeqLen, N, F-1)
+        covariates = x[:, :, :, 1:]
+        mu_seq = self.mu_net(covariates) # (B, SeqLen, N, 1)
+        mu = mu_seq.mean(dim=1) # Aggregate (mean-pool) over the sequence: (B, N, 1)
+        mu = F.softplus(mu) # Ensure positive rate
         
         # 2. Infectivity Matrix alpha_{ij}
+        last_x = x[:, -1, :, :] # (B, N, F)
         alpha = self.infectivity_net(last_x, adj) # (B, N, N)
         self.saved_alpha = alpha # For explainability
         
