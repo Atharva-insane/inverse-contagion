@@ -3,7 +3,7 @@ import pandas as pd
 import os
 import pickle
 
-def evaluate_mae(model_dir='../models', data_dir='../processed_data'):
+def evaluate_mae(model_dir='../models', data_dir='../processed_data', out_dir='../output'):
     print("Loading EM Parameters and Event Log...")
     try:
         alpha = np.load(os.path.join(model_dir, 'alpha.npy'))
