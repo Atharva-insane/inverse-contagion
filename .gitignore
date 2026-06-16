@@ -1,0 +1,17 @@
+# Ignore large datasets
+flights.csv
+airports.csv
+airlines.csv
+
+# Ignore processed tensors
+processed_data/
+
+# Ignore saved model weights (keep the directory)
+models/*.pth
+
+# Ignore generated outputs
+output/
+
+# Python cache
+__pycache__/
+*.pyc
