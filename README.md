@@ -68,16 +68,27 @@ By extracting the learned Attention Weights ($\alpha$), we calculated an MES rep
 
 ---
 
-## Ⅵ. Repository Guide & Visual Proof
+## Ⅵ. Repository Guide & File Architecture
 
-### Running the Digital Twin
-Ensure PyTorch is installed, then execute:
-1. `python src/data_prep.py` (Extracts discrete cascade events)
-2. `python src/train.py` (Optimizes the Point-Process Log-Likelihood)
-3. `python src/evaluate.py` (Generates Log-Likelihood and Pseudo $R^2$)
-4. `python src/infer.py` (Decouples endogenous vs exogenous risk)
-5. `python src/visualize.py` (Geographical contagion mapping)
-6. `python src/plot_insights.py` (Decay kernel and stacked area charts)
+To prove the robustness of this Digital Twin, the codebase is highly modularized. Below is the exact function of every file in the `src/` directory:
+
+### 1. The Core Pipeline
+* **`src/data_prep.py`**: The Data Engineer. It ingests 500MB+ of raw DOT tabular data, filters for the Top 50 mega-hubs, and explicitly extracts discrete "Contagion Events" (delays $>15$ mins). It outputs the strict chronological spatial-temporal tensors ($N_i(t)$) required for point-process inversion.
+* **`src/model.py`**: The Brain. This defines the complete `NeuralGraphHawkesProcess` PyTorch architecture. It contains the logic for the Sigmoid Graph Attention infectivity ($\alpha$), the full-sequence diurnal covariates ($\mu$), and the node-specific exponential recovery vectors ($\beta$).
+* **`src/train.py`**: The Optimizer. It implements a strict chronological Train/Validation split (80th percentile) to absolutely prevent temporal leakage. It executes the backpropagation using the rigorous Poisson Negative Log-Likelihood objective function.
+
+### 2. Validation & Evaluation
+* **`src/evaluate.py`**: The Auditor. It strips away standard MSE regression metrics and calculates the Generative Point-Process Log-Likelihood on held-out data (achieving a 22.21% Pseudo $R^2$ improvement). Crucially, it mathematically proves "Structural Recovery" by verifying that the highest learned $\alpha$ attention edges perfectly map to real-world empirical flight routes.
+* **`src/plot_qq.py`**: The Statistician. It generates rigorous Q-Q plots to prove that the model's residuals represent unbiased "white noise," directly addressing Time-Rescaling Theorem consistency requirements for point-processes.
+
+### 3. Inference & Explainability
+* **`src/infer.py`**: The Simulator. It isolates an extreme, real-world historical disruption from the held-out validation set and "replays" it forward. It explicitly decouples the resulting network delays into pure Exogenous Background vs. Endogenous Contagion, and calculates the Multi-Exposure Score (MES) to identify the most vulnerable physical hubs.
+* **`src/visualize.py`**: The Cartographer. It translates the highly sparse, abstract $\alpha$ infectivity matrix into a clear geographical plot (`hawkes_contagion_map_ATL.png`), tracing exactly how a localized disruption structurally infects the rest of the continent.
+* **`src/plot_insights.py`**: The Analyst. It generates visual proof of the Hawkes equation via a 24-hour stacked area chart (`hawkes_decomposition_ATL.png`), and physically plots the mathematically learned recovery half-life curve (`learned_kernel.png`).
+
+### Execution Guide
+Ensure PyTorch is installed, then execute the pipeline sequentially:
+`python src/data_prep.py` -> `python src/train.py` -> `python src/evaluate.py` -> `python src/infer.py` -> `python src/visualize.py`
 
 ### Visual Outputs (`output/`)
 The Digital Twin outputs explicit, visual proof of its generative capabilities:
