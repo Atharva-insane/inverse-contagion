@@ -58,20 +58,28 @@ def generate_visual_suite(model_dir='../models', data_dir='../processed_data', o
     
     # 2. Adjacency-Constrained Alpha Heatmap
     print("Generating Alpha Heatmap...")
-    plt.figure(figsize=(10, 8))
-    im = plt.imshow(alpha, cmap='Reds', aspect='auto')
+    plt.figure(figsize=(12, 10))
+    
+    # We must show the FULL 50x50 matrix to demonstrate sparsity, 
+    # not just the top 20 (which are all dense mega-hubs that fly to each other)
+    
+    # We clip the maximum color value (vmax) to the 95th percentile.
+    # Otherwise, massive self-excitation values on the diagonal wash out all the off-diagonal colors.
+    nonzero_alpha = alpha[alpha > 0]
+    vmax_val = np.percentile(nonzero_alpha, 95) if len(nonzero_alpha) > 0 else 0.1
+    
+    # Zeros (structural constraints) will be pure white, active routes will be shades of red
+    im = plt.imshow(alpha, cmap='Reds', aspect='equal', vmin=0, vmax=vmax_val)
     plt.colorbar(im, label='Infectivity Weight ($\u03B1_{ij}$)')
     
-    # Show only top 20 airports on axes for clarity
-    top_20 = airports[:20]
-    plt.xticks(np.arange(20), top_20, rotation=90)
-    plt.yticks(np.arange(20), top_20)
-    plt.xlim(-0.5, 19.5)
-    plt.ylim(19.5, -0.5)
+    plt.xticks(np.arange(num_nodes), airports, rotation=90, fontsize=6)
+    plt.yticks(np.arange(num_nodes), airports, fontsize=6)
     
-    plt.title(r'Strictly Constrained Infectivity Matrix ($\alpha_{ij}$)', fontsize=16, fontweight='bold')
-    plt.xlabel('Target Airport (Infected)')
-    plt.ylabel('Source Airport (Delayed)')
+    # Add a grid to make the sparsity clear
+    plt.grid(which='minor', color='gray', linestyle='-', linewidth=0.5, alpha=0.2)
+    plt.title(r'Strictly Constrained Infectivity Matrix ($\alpha_{ij}$)', fontsize=18, fontweight='bold')
+    plt.xlabel('Target Airport (Infected)', fontsize=12)
+    plt.ylabel('Source Airport (Delayed)', fontsize=12)
     plt.tight_layout()
     plt.savefig(os.path.join(out_dir, 'alpha_heatmap.png'), dpi=300)
     plt.close()
